@@ -5,8 +5,6 @@ Investigation of how the type and amount of data describing network dynamics inf
 
 ## Task Allocation
 
-## Task Allocation
-
 ### Data Generation - Part 1
 **Assignee:** Michal-Zgieb
 
