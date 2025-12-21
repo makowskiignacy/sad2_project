@@ -27,10 +27,9 @@ Investigation of how the type and amount of data describing network dynamics inf
 2. **Dataset Generation:**
    - Generate appropriate datasets for network inference based on insights from Part 1.
 
-### BN Recreation (BNFinder) & Evaluation
-**Assignees:** AncientG7eek and veranika-k
+### BN Inference (BNFinder) & Evaluation - Part 1
+**Assignee:** veranika-k
 
-**For Part 1 Datasets:**
 1. **Infer Dynamic Bayesian Networks:**
    - Tool: BNFinder2.
    - Scoring functions: MDL and BDe.
@@ -39,8 +38,9 @@ Investigation of how the type and amount of data describing network dynamics inf
    - Use at least two structure-based graph distance measures.
    - Analyze impact of dataset characteristics and scoring functions.
 
-**For Part 2 (Biological Model):**
-1. **Reconstruct Network:**
+### BN Inference (BNFinder) & Evaluation - Part 2 (Biological Model):**
+**Assignee:** AncientG7eek
+1. **Infer a Dynamic Network:**
    - Use BNFinder2 with chosen scoring function.
 2. **Evaluate:**
    - Evaluate reconstruction accuracy against the validated biological model.
