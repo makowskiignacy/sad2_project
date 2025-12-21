@@ -1,5 +1,7 @@
 D:\SAD2\.venv\Scripts\python.exe D:\SAD2\zad1-2.py 
 
+run_experiment("BN1", nodes=6,  steps=100, sample_every=1)
+
 BOOLEAN NETWORK BN1
 X0 <- NONE
    f0 = 0
@@ -22,6 +24,8 @@ sync  transient/attractor = (0.0, 1.0)
 async transient/attractor = (0.009900990099009901, 0.9900990099009901)
 
 ===========
+
+run_experiment("BN2", nodes=10, steps=120, sample_every=3)
 
 BOOLEAN NETWORK BN2
 X0 <- X6, X3
@@ -53,6 +57,8 @@ sync  transient/attractor = (0.024390243902439025, 0.975609756097561)
 async transient/attractor = (0.12195121951219512, 0.8780487804878049)
 
 ===========
+
+run_experiment("BN3", nodes=14, steps=60,  sample_every=2)
 
 BOOLEAN NETWORK BN3
 X0 <- X9
@@ -93,4 +99,3 @@ async transient/attractor = (0.1935483870967742, 0.8064516129032258)
 
 ===========
 
-Process finished with exit code 0
