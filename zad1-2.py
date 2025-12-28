@@ -1,21 +1,26 @@
 import random
+import os
 
 
 def random_boolean_function(k, parent_names):
     """
-    Generuje jedną, stałą funkcję Boolean dla pojedynczego węzła.
+    Generuje losową funkcję Boolean przypisaną do pojedynczego węzła sieci.
+
+    Dla k = 0 tworzona jest funkcja stała (0 lub 1).
+    Dla k > 0 funkcja jest losową kombinacją operatorów AND / OR
+    pomiędzy stanami rodziców, z opcjonalną negacją całego wyrażenia.
 
     Parametry:
     k : int
         Liczba rodziców węzła.
     parent_names : list[str]
-        Nazwy węzłów-rodziców używane do budowy zapisu logicznego.
+        Nazwy węzłów-rodziców używane do zapisu logicznego funkcji.
 
     Zwraca:
     f : callable
-        Funkcja aktualizacji węzła.
+        Funkcja aktualizacji węzła, przyjmująca listę stanów rodziców.
     expr : str
-        Czytelny zapis logiczny funkcji aktualizacji węzła.
+        Czytelny zapis logiczny funkcji aktualizacji.
     """
     if k == 0:
         value = random.randint(0, 1)
@@ -27,17 +32,17 @@ def random_boolean_function(k, parent_names):
     ops = [random.choice(["AND", "OR"]) for _ in range(k - 1)]
     negate = random.choice([True, False])
 
-    def f(bits, ops=ops, negate=negate):
+    def f(bits):
         """
-        Oblicza wartość funkcji Boolean dla danego wektora stanów rodziców.
+        Oblicza nowy stan węzła na podstawie aktualnych stanów jego rodziców.
 
         Parametry:
         bits : list[int]
-            Aktualne stany rodziców węzła.
+            Aktualne stany węzłów-rodziców (0 lub 1).
 
         Zwraca:
         int
-            Nowy stan węzła.
+            Nowy stan węzła (0 lub 1).
         """
         out = bits[0]
         for b, op in zip(bits[1:], ops):
@@ -60,7 +65,12 @@ def random_boolean_function(k, parent_names):
 
 def generate_network(n, max_parents=3):
     """
-    Generuje losową sieć Boolean.
+    Generuje losową sieć Boolean o zadanej liczbie węzłów.
+
+    Każdy węzeł:
+    - ma losową liczbę rodziców (od 0 do max_parents),
+    - nie posiada samozależności (Xi nie zależy od Xi),
+    - otrzymuje losową funkcję Boolean.
 
     Parametry:
     n : int
@@ -70,26 +80,22 @@ def generate_network(n, max_parents=3):
 
     Zwraca:
     parents : dict[int, list[int]]
-        lista indeksów węzłów-rodziców.
+        Struktura zależności – lista rodziców dla każdego węzła.
     functions : dict[int, callable]
-        funkcja aktualizacji.
+        Funkcje aktualizacji przypisane do węzłów.
     expressions : dict[int, str]
-       zapis logiczny funkcji aktualizacji.
+        Zapisy logiczne funkcji aktualizacji.
     """
     parents = {}
     functions = {}
     expressions = {}
 
     for i in range(n):
-        k = random.randint(0, max_parents)
-
-        # TODO
-        # Czy należy wykluczyć samozależności węzłów, ponieważ program BNFinder2 ich nie obsługuje?
-        possible = [j for j in range(n)]
+        possible = [j for j in range(n) if j != i]
+        k = random.randint(1, min(max_parents, len(possible)))
         ps = random.sample(possible, k)
 
-        parent_names = [f"X{p}" for p in ps]
-        func, expr = random_boolean_function(len(ps), parent_names)
+        func, expr = random_boolean_function(len(ps), [f"X{p}" for p in ps])
 
         parents[i] = ps
         functions[i] = func
@@ -100,12 +106,13 @@ def generate_network(n, max_parents=3):
 
 def print_network(parents, expressions):
     """
-    Wypisuje strukturę sieci Boolean oraz funkcje aktualizacji węzłów.
+    Wypisuje strukturę sieci Boolean w postaci listy zależności
+    oraz odpowiadające im funkcje aktualizacji.
 
     Parametry:
-    parents : dict
+    parents : dict[int, list[int]]
         Struktura zależności w sieci.
-    expressions : dict
+    expressions : dict[int, str]
         Zapisy logiczne funkcji aktualizacji.
     """
     for i in parents:
@@ -117,14 +124,17 @@ def print_network(parents, expressions):
 
 def update_sync(state, parents, functions):
     """
-    Wykonuje jeden synchroniczny krok aktualizacji sieci.
+    Wykonuje jeden synchroniczny krok aktualizacji sieci Boolean.
+
+    Wszystkie węzły są aktualizowane jednocześnie
+    na podstawie stanu z poprzedniego kroku.
 
     Parametry:
     state : list[int]
         Aktualny stan całej sieci.
-    parents : dict
-        Struktura zależności między węzłami.
-    functions : dict
+    parents : dict[int, list[int]]
+        Struktura zależności w sieci.
+    functions : dict[int, callable]
         Funkcje aktualizacji węzłów.
 
     Zwraca:
@@ -133,41 +143,45 @@ def update_sync(state, parents, functions):
     """
     new = state[:]
     for i in range(len(state)):
-        ps = parents[i]
-        if ps:
-            bits = [state[p] for p in ps]
+        if parents[i]:
+            bits = [state[p] for p in parents[i]]
             new[i] = functions[i](bits)
     return new
 
 
 def update_async(state, parents, functions):
     """
-    Wykonuje jeden asynchroniczny krok aktualizacji sieci.
+    Wykonuje jeden asynchroniczny krok aktualizacji sieci Boolean.
+
+    W jednym kroku losowo wybierany jest jeden węzeł,
+    którego stan zostaje zaktualizowany.
 
     Parametry:
     state : list[int]
         Aktualny stan całej sieci.
-    parents : dict
-        Struktura zależności między węzłami.
-    functions : dict
+    parents : dict[int, list[int]]
+        Struktura zależności w sieci.
+    functions : dict[int, callable]
         Funkcje aktualizacji węzłów.
 
     Zwraca:
     list[int]
-        Nowy stan sieci po aktualizacji jednego losowego węzła.
+        Nowy stan sieci po aktualizacji jednego węzła.
     """
     new = state[:]
     i = random.randrange(len(state))
-    ps = parents[i]
-    if ps:
-        bits = [state[p] for p in ps]
+    if parents[i]:
+        bits = [state[p] for p in parents[i]]
         new[i] = functions[i](bits)
     return new
 
 
 def simulate_sync(network, steps):
     """
-    Symuluje dynamikę synchroniczną sieci Boolean.
+    Symuluje jedną trajektorię synchroniczną sieci Boolean.
+
+    Trajektoria startuje z losowego stanu początkowego
+    i rozwija się zgodnie z synchroniczną dynamiką sieci.
 
     Parametry:
     network : tuple
@@ -180,8 +194,7 @@ def simulate_sync(network, steps):
         Trajektoria stanów sieci w czasie.
     """
     parents, functions, _ = network
-    n = len(parents)
-    state = [random.randint(0, 1) for _ in range(n)]
+    state = [random.randint(0, 1) for _ in parents]
     traj = [state[:]]
 
     for _ in range(steps):
@@ -193,7 +206,10 @@ def simulate_sync(network, steps):
 
 def simulate_async(network, steps):
     """
-    Symuluje dynamikę asynchroniczną sieci Boolean.
+    Symuluje jedną trajektorię asynchroniczną sieci Boolean.
+
+    Trajektoria startuje z losowego stanu początkowego
+    i w każdym kroku aktualizowany jest jeden losowy węzeł.
 
     Parametry:
     network : tuple
@@ -206,8 +222,7 @@ def simulate_async(network, steps):
         Trajektoria stanów sieci w czasie.
     """
     parents, functions, _ = network
-    n = len(parents)
-    state = [random.randint(0, 1) for _ in range(n)]
+    state = [random.randint(0, 1) for _ in parents]
     traj = [state[:]]
 
     for _ in range(steps):
@@ -217,113 +232,112 @@ def simulate_async(network, steps):
     return traj
 
 
-def compute_proportions(traj):
+def save_bnf(filename, dataset):
     """
-    Oblicza proporcję stanów przejściowych i atraktorowych w trajektorii.
-
-    Parametry:
-    traj : list[list[int]]
-        Trajektoria stanów sieci.
-
-    Zwraca:
-    (float, float)
-        Udział stanów przejściowych oraz atraktorowych.
-    """
-    seen = {}
-    for t, state in enumerate(traj):
-        key = tuple(state)
-        if key in seen:
-            transient = seen[key]
-            attractor = len(traj) - seen[key]
-            total = len(traj)
-            return transient / total, attractor / total
-        seen[key] = t
-
-    return 1.0, 0.0
-
-
-def save_bnf(filename, traj):
-    """
-    Zapisuje trajektorię do pliku w formacie zgodnym z BNFinder2.
+    Zapisuje zestaw trajektorii do pliku w formacie kompatybilnym
+    z programem BNFinder2 w katalogu BN-data/.
 
     Parametry:
     filename : str
-        Nazwa pliku wyjściowego.
-    traj : list[list[int]]
-        Trajektoria stanów sieci.
+        Nazwa pliku (bez ścieżki).
+    dataset : list[list[list[int]]]
+        Zestaw trajektorii sieci Boolean.
     """
-    genes = len(traj[0])
-    steps = len(traj)
+    genes = len(dataset[0][0])
+    path = os.path.join(OUTPUT_DIR, filename)
 
-    with open(filename, "w") as f:
-        f.write("Gene")
-        for t in range(steps):
-            f.write(f"\tS{t}")
-        f.write("\n")
-
-        for g in range(genes):
-            f.write(f"X{g}")
-            for t in range(steps):
-                f.write(f"\t{traj[t][g]}")
+    with open(path, "w") as f:
+        for traj in dataset:
+            f.write("Gene")
+            for t in range(len(traj)):
+                f.write(f"\tS{t}")
             f.write("\n")
 
-    print("saved:", filename)
+            for g in range(genes):
+                f.write(f"X{g}")
+                for state in traj:
+                    f.write(f"\t{state[g]}")
+                f.write("\n")
+
+            f.write("\n")
+
+    print("saved:", path)
 
 
-def run_experiment(name, nodes, steps, sample_every):
+def run_trajektorie(network, nodes, steps, sample_every, n_traj):
     """
-    Generuje sieć Boolean, symuluje jej dynamikę
-    oraz zapisuje dane przy unikalnych proporcjach atraktorów.
+    Generuje i zapisuje zestaw trajektorii dla JEDNEJ konfiguracji
+    parametrów trajektorii.
 
     Parametry:
-    name : str
-        Nazwa eksperymentu.
+    network : tuple
+        Sieć Boolean.
     nodes : int
-        Liczba węzłów sieci.
+        Liczba węzłów (do nazwy pliku).
     steps : int
-        Liczba kroków symulacji.
+        Długość trajektorii.
     sample_every : int
-        Częstotliwość próbkowania trajektorii.
+        Częstotliwość próbkowania.
+    n_traj : int
+        Liczba trajektorii.
     """
-    attempt = 0
+    sync_data = []
+    async_data = []
 
-    while True:
-        attempt += 1
-        network = generate_network(nodes)
-        parents, _, expressions = network
-
-        # TODO
-        # Czy trajektorie powinny być liczone dla jednego stanu początkowego, czy dla wielu lub wszystkich możliwych?
+    for _ in range(n_traj):
         sync = simulate_sync(network, steps)[::sample_every]
         async_traj = simulate_async(network, steps)[::sample_every]
+        sync_data.append(sync)
+        async_data.append(async_traj)
 
-        # TODO
-        # Czy sprawdzać proporcjach stanów przejściowych i atraktorowych pomiędzy trajektoriami?
-        p_sync = compute_proportions(sync)
-        p_async = compute_proportions(async_traj)
-
-        key = (round(p_sync[1], 3), round(p_async[1], 3))
-
-        if key not in used_props:
-            used_props.add(key)
-
-            print(f"\nBOOLEAN NETWORK {name}")
-            print_network(parents, expressions)
-            print("\n")
-
-            save_bnf(f"{name}_sync.data", sync)
-            save_bnf(f"{name}_async.data", async_traj)
-
-            print(f"{name} accepted after {attempt} attempts")
-            print(f"sync  transient/attractor = {p_sync}")
-            print(f"async transient/attractor = {p_async}")
-            print("\n===========")
-            break
+    save_bnf(f"nodes{nodes}_steps{steps}_sample{sample_every}_ntraj{n_traj}_sync.data", sync_data)
+    
+    save_bnf(f"nodes{nodes}_steps{steps}_sample{sample_every}_ntraj{n_traj}_async.data", async_data)
 
 
+def run_experiment(nodes, steps, sample_every, n_traj):
+    """
+    Przeprowadza eksperyment OFAT (one-factor-at-a-time).
+
+    Dla każdej liczby węzłów:
+    - generowana jest jedna sieć Boolean,
+    - tworzonych jest kilka zestawów danych,
+      z których każdy różni się TYLKO JEDNYM parametrem trajektorii.
+
+    Parametry:
+    nodes : list[int]
+    steps : list[int]
+    sample_every : list[int]
+    n_traj : list[int]
+    """
+    for n in nodes:
+        network = generate_network(n)
+        parents, _, expressions = network
+
+        print(f"\nBOOLEAN NETWORK (nodes = {n})")
+        for i in parents:
+            ps = ", ".join(f"X{p}" for p in parents[i]) if parents[i] else "NONE"
+            print(f"X{i} <- {ps}")
+            print(f"   f{i} = {expressions[i]}")
+        print("")
+
+        # zmieniamy TYLKO liczbę kroków
+        for s in steps:
+            run_trajektorie(network, n, s, sample_every[0], n_traj[0])
+
+        # zmieniamy TYLKO próbkowanie
+        for samp in sample_every:
+            run_trajektorie(network, n, steps[0], samp, n_traj[0])
+
+        # zmieniamy TYLKO liczbę trajektorii
+        for nt in n_traj:
+            run_trajektorie(network, n, steps[0], sample_every[0], nt)
+
+        print("\n======================")
+        
 if __name__ == "__main__":
-    used_props = set()
+    OUTPUT_DIR = "BN_data"
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    run_experiment("BN1", nodes=6,  steps=100, sample_every=1)
-    run_experiment("BN2", nodes=10, steps=120, sample_every=3)
-    run_experiment("BN3", nodes=14, steps=60,  sample_every=2)
+    run_experiment( nodes=[8,15], steps=[20,30], sample_every=[1,2], n_traj=[10,20])
+
