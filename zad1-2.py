@@ -1,5 +1,8 @@
+from pyboolnet.trap_spaces import compute_trap_spaces
+from pyboolnet.repository import bnet2primes
 import random
 import os
+import re
 
 
 def random_boolean_function(k, parent_names):
@@ -24,10 +27,7 @@ def random_boolean_function(k, parent_names):
     """
     if k == 0:
         value = random.randint(0, 1)
-        return (
-            lambda bits, v=value: v,
-            str(value)
-        )
+        return lambda bits, v=value: v, str(value)
 
     ops = [random.choice(["AND", "OR"]) for _ in range(k - 1)]
     negate = random.choice([True, False])
@@ -118,9 +118,144 @@ def print_network(parents, expressions):
     for i in parents:
         ps = parents[i]
         ps_str = ", ".join(f"X{p}" for p in ps) if ps else "NONE"
-        print(f"X{i} <- {ps_str}")
-        print(f"   f{i} = {expressions[i]}")
+        line1 = f"X{i} <- {ps_str}"
+        print(line1)
+        REPORT.write(line1 + "\n")
 
+        line2 = f"   f{i} = {expressions[i]}"
+        print(line2)
+        REPORT.write(line2 + "\n")
+
+def convert_to_pyboolnet(expressions):
+    """
+    Konwertuje funkcje aktualizacji sieci boolowskiej z wewnętrznej
+    reprezentacji symbolicznej do formatu .bnet akceptowanego
+    przez bibliotekę PyBoolNet.
+
+    Parametry:
+    expressions : dict[int, str]
+        Słownik mapujący indeks węzła na wyrażenie logiczne.
+
+    Zwraca:
+    str
+        Tekstowa reprezentacja sieci w formacie .bnet.
+    """
+    result = []
+
+    for idx in sorted(expressions):
+        expr = expressions[idx]
+
+        # operatory logiczne
+        expr = expr.replace("∧", "&").replace("∨", "|").replace("¬", "!")
+
+        # Xi → vi
+        expr = re.sub(r"X(\d+)", r"v\1", expr)
+
+        result.append(f"v{idx},   {expr}")
+
+    return "\n".join(result)
+
+
+
+def find_sync_attractors(network):
+    """
+    Identyfikuje atraktory synchroniczne sieci boolowskiej.
+    Atraktory synchroniczne (punkty stałe i cykle) są wyznaczane
+    poprzez pełne przejście deterministycznego grafu stanów,
+    co jest równoważne definicji atraktora w dynamice synchronicznej.
+
+    Parametry
+    network : tuple
+        Krotka (parents, functions, expressions) opisująca sieć.
+
+
+    Zwraca
+    list[set[tuple[int]]]
+        Lista atraktorów, z których każdy jest zbiorem stanów.
+    """
+    parents, functions, _ = network
+    n = len(parents)
+
+    visited = {}
+    attractors = []
+
+    for mask in range(2 ** n):
+        state = [(mask >> i) & 1 for i in range(n)]
+        path = []
+
+        while tuple(state) not in visited:
+            visited[tuple(state)] = len(path)
+            path.append(tuple(state))
+            state = update_sync(state, parents, functions)
+
+        start = visited[tuple(state)]
+        cycle = set(path[start:])
+        if cycle not in attractors:
+            attractors.append(cycle)
+
+    return attractors
+
+
+def find_async_attractors(expressions):
+    """
+    Identyfikuje atraktory asynchroniczne sieci boolowskiej.
+    Atraktory asynchroniczne są definiowane jako minimalne trap spaces
+    w grafie przejść asynchronicznych i wyznaczane przy użyciu PyBoolNet.
+
+    Parametry
+    expressions : dict[int, str]
+        Zapisy logiczne funkcji aktualizacji.
+
+    Zwraca
+    list[set[tuple[int]]]
+        Lista atraktorów asynchronicznych reprezentowanych jako zbiory stanów.
+    """
+    bnet = convert_to_pyboolnet(expressions)
+    primes = bnet2primes(bnet)
+    n = len(expressions)
+
+    attractors = []
+    trap_spaces = compute_trap_spaces(primes, "min")
+
+    for ts in trap_spaces:
+        fixed = {int(k[1:]): int(v) for k, v in ts.items() if v in (0, 1)}
+        free = [i for i in range(n) if i not in fixed]
+
+        states = set()
+        for mask in range(2 ** len(free)):
+            state = fixed.copy()
+            for i, b in zip(free, format(mask, f"0{len(free)}b")):
+                state[i] = int(b)
+            states.add(tuple(state[i] for i in range(n)))
+
+        attractors.append(states)
+
+    return attractors
+
+
+def compute_proportions(traj, attractors):
+    """
+    Oblicza proporcję stanów przejściowych (transient)
+    oraz atraktorowych w trajektorii.
+
+    Parametry:
+    traj : list[list[int]]
+        Jedna trajektoria sieci boolowskiej.
+    attractors : list[set[tuple[int]]]
+        Lista atraktorów (każdy jako zbiór stanów).
+
+    Zwraca:
+    tuple(float, float)
+        (proportion_transient, proportion_attractor)
+    """
+    if not attractors:
+        return 1.0, 0.0
+
+    attractor_states = set().union(*attractors)
+    total = len(traj)
+    a = sum(tuple(state) in attractor_states for state in traj)
+
+    return 1.0 - a / total, a / total
 
 def update_sync(state, parents, functions):
     """
@@ -266,12 +401,15 @@ def save_bnf(filename, dataset):
 
 def run_trajektorie(network, nodes, steps, sample_every, n_traj):
     """
-    Generuje i zapisuje zestaw trajektorii dla JEDNEJ konfiguracji
-    parametrów trajektorii.
+    Generuje trajektorie synchroniczne i asynchroniczne dla JEDNEJ
+    konfiguracji parametrów, zapisuje je do plików BNFinder2
+    ORAZ oblicza proporcje stanów transient / attractor
+    na podstawie atraktorów wykrytych przez PyBoolNet.
+
 
     Parametry:
     network : tuple
-        Sieć Boolean.
+        (parents, functions, expressions)
     nodes : int
         Liczba węzłów (do nazwy pliku).
     steps : int
@@ -284,42 +422,70 @@ def run_trajektorie(network, nodes, steps, sample_every, n_traj):
     sync_data = []
     async_data = []
 
-    for _ in range(n_traj):
-        sync = simulate_sync(network, steps)[::sample_every]
+    parents, _, expressions = network
+
+    # znajdź atraktory dla tej sieci
+    sync_attr = find_sync_attractors(network)
+    async_attr = find_async_attractors(expressions)
+
+    header = f"[Attractors | nodes={nodes}, steps={steps}, sample={sample_every}, ntraj={n_traj}]"
+    print("\n" + header)
+    REPORT.write("\n"+header + "\n")
+
+    line = f"  sync  attractors : {len(sync_attr)}"
+    print(line)
+    REPORT.write(line + "\n")
+
+    line = f"  async attractors : {len(async_attr)}"
+    print(line)
+    REPORT.write(line + "\n")
+
+    for i in range(n_traj):
+        sync_traj = simulate_sync(network, steps)[::sample_every]
         async_traj = simulate_async(network, steps)[::sample_every]
-        sync_data.append(sync)
+
+        sync_data.append(sync_traj)
         async_data.append(async_traj)
 
+        p_sync = compute_proportions(sync_traj, sync_attr)
+        p_async = compute_proportions(async_traj, async_attr)
+
+        line = f"  traj {i + 1:02d} | sync={p_sync} | async={p_async}"
+        print(line)
+        REPORT.write(line + "\n")
+
     save_bnf(f"nodes{nodes}_steps{steps}_sample{sample_every}_ntraj{n_traj}_sync.data", sync_data)
-    
+
     save_bnf(f"nodes{nodes}_steps{steps}_sample{sample_every}_ntraj{n_traj}_async.data", async_data)
 
 
 def run_experiment(nodes, steps, sample_every, n_traj):
     """
-    Przeprowadza eksperyment OFAT (one-factor-at-a-time).
-
-    Dla każdej liczby węzłów:
-    - generowana jest jedna sieć Boolean,
-    - tworzonych jest kilka zestawów danych,
-      z których każdy różni się TYLKO JEDNYM parametrem trajektorii.
+    Dla każdej liczby węzłów generowana jest jedna sieć boolowska,
+    a następnie tworzone są zestawy danych różniące się pojedynczym
+    parametrem (długość trajektorii, częstość próbkowania lub liczba
+    trajektorii).
 
     Parametry:
     nodes : list[int]
+        Lista rozmiarów sieci.
     steps : list[int]
+        Lista długości trajektorii.
     sample_every : list[int]
+        Lista częstości próbkowania.
     n_traj : list[int]
+        Lista liczby trajektorii.
     """
     for n in nodes:
         network = generate_network(n)
         parents, _, expressions = network
 
-        print(f"\nBOOLEAN NETWORK (nodes = {n})")
-        for i in parents:
-            ps = ", ".join(f"X{p}" for p in parents[i]) if parents[i] else "NONE"
-            print(f"X{i} <- {ps}")
-            print(f"   f{i} = {expressions[i]}")
-        print("")
+        title = f"BOOLEAN NETWORK (nodes = {n})"
+        print("\n" + title)
+        REPORT.write(title + "\n\n")
+
+        print_network(parents, expressions)
+
 
         # zmieniamy TYLKO liczbę kroków
         for s in steps:
@@ -334,10 +500,12 @@ def run_experiment(nodes, steps, sample_every, n_traj):
             run_trajektorie(network, n, steps[0], sample_every[0], nt)
 
         print("\n======================")
-        
+        REPORT.write("\n======================\n\n")
+
+
 if __name__ == "__main__":
+
     OUTPUT_DIR = "BN_data"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    run_experiment( nodes=[8,15], steps=[20,30], sample_every=[1,2], n_traj=[10,20])
-
+    REPORT = open("report.txt", "w", encoding="utf-8")
+    run_experiment( nodes=[8,16], steps=[20,30], sample_every=[1,2], n_traj=[10,30])
