@@ -23,7 +23,8 @@ Investigation of how the type and amount of data describing network dynamics inf
 
 1. **Model Selection:**
    - Select a validated Boolean network model from [Biodivine repository](https://github.com/sybila/biodivine-boolean-models).
-   - Constraint: Size ≤ 16 nodes.
+   - **Selected Model:** Mammalian Cell Cycle (Fauré et al., 2006).
+   - Constraint: Size ≤ 16 nodes (Model has 10 nodes).
 2. **Dataset Generation:**
    - Generate appropriate datasets for network inference based on insights from Part 1.
 
