@@ -89,6 +89,10 @@ def main():
     MODELS_DIR = "models"
     OUTPUT_DIR = "BN_data"
     
+    MAX_NODES = 16
+    NUM_TRAJECTORIES = 10
+    TRAJECTORY_LENGTH = 30
+    
     os.makedirs(MODELS_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
@@ -110,13 +114,19 @@ def main():
         network, node_names = bn.load_bnet(bnet_file)
         model_name = os.path.basename(folder)
             
-        # Generate synchronous trajectories
-        sync_data = [bn.simulate_sync(network, 50) for _ in range(10)]
-        bn.save_bnf(os.path.join(OUTPUT_DIR, f"{model_name}_sync.data"), sync_data, node_names)
+        # Create a directory for this model's data
+        model_output_dir = os.path.join(OUTPUT_DIR, model_name)
+        os.makedirs(model_output_dir, exist_ok=True)
             
-        # Generate asynchronous trajectories
-        async_data = [bn.simulate_async(network, 50) for _ in range(10)]
-        bn.save_bnf(os.path.join(OUTPUT_DIR, f"{model_name}_async.data"), async_data, node_names)
+        # Generate and save trajectories individually
+        for i in range(NUM_TRAJECTORIES):
+            # Synchronous
+            sync_traj = bn.simulate_sync(network, TRAJECTORY_LENGTH)
+            bn.save_bnf(os.path.join(model_output_dir, f"trajectory_sync_{i}.data"), sync_traj, node_names)
+            
+            # Asynchronous
+            async_traj = bn.simulate_async(network, TRAJECTORY_LENGTH)
+            bn.save_bnf(os.path.join(model_output_dir, f"trajectory_async_{i}.data"), async_traj, node_names)
             
 if __name__ == "__main__":
     main()
