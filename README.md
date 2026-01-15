@@ -3,6 +3,10 @@
 ## Project Description
 Investigation of how the type and amount of data describing network dynamics influence the accuracy of inferring network structure within the framework of Bayesian networks using BNFinder2.
 
+## Project report
+Details on the experimental setup and results. Currently, the link below points to an Overleaf project under construction.
+[Project report](https://www.overleaf.com/read/ttjxjstvmmcq#94a393)
+
 ## Task Allocation
 
 ### Data Generation - Part 1
