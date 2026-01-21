@@ -49,3 +49,44 @@ Details on the experimental setup and results. Currently, the link below points 
    - Use BNFinder2 with chosen scoring function.
 2. **Evaluate:**
    - Evaluate reconstruction accuracy against the validated biological model.
+
+## How to Run
+
+### Prerequisites
+- Python 3
+- `pyboolnet` library (required for Part 1)
+  ```bash
+  pip install git+https://github.com/hklarner/pyboolnet
+  # Note: Ensure you have git installed.
+  ```
+
+### Data Generation
+
+#### Part 1: Random Boolean Networks
+Generates random Boolean networks and simulates trajectories with varying parameters.
+
+- **Command:**
+  ```bash
+  python3 zad1-2.py
+  ```
+- **Output:**
+  - Data files in `BN_data/` directory (e.g., `nodes8_steps20_sample1_ntraj10_sync.data`).
+  - `report.txt`: Contains structure of generated networks and analysis of attractors.
+
+#### Part 2: Biological Models
+Downloads validated biological models (≤ 16 nodes) and generates trajectories.
+
+- **Command:**
+  ```bash
+  python3 generate_trajectories.py
+  ```
+- **Output:**
+  - Subdirectories in `BN_data/` for each downloaded model (e.g., `BN_data/099_YEAST-HYPHAL-TRANSITION/`).
+  - `.data` files inside each model folder containing the trajectories.
+
+### Checking Results
+1. **Check Commands:** Ensure scripts run without errors. `zad1-2.py` may take some time as it generates multiple datasets.
+2. **Check Data:**
+   - Verify `BN_data/` exists and contains output files.
+   - Inspect `report.txt` to verify network structures were generated and attractors found.
+   - The `.data` files should follow the BNFinder format (Time series data).
