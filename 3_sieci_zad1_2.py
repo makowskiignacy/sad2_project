@@ -457,8 +457,8 @@ def run_trajektorie(network, nodes, steps, sample_every, n_traj):
     REPORT.write(line + "\n")
 
     for i in range(n_traj):
-        sync_traj = simulate_sync(network, steps-1)[::sample_every]
-        async_traj = simulate_async(network, steps-1)[::sample_every]
+        sync_traj = simulate_sync(network, (steps-1)*sample_every)[::sample_every]
+        async_traj = simulate_async(network, (steps-1)*sample_every)[::sample_every]
 
         sync_data.append(sync_traj)
         async_data.append(async_traj)
