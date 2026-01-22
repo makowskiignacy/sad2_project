@@ -90,8 +90,16 @@ def main():
     OUTPUT_DIR = "BN_data"
     
     MAX_NODES = 16
-    NUM_TRAJECTORIES = 10
-    TRAJECTORY_LENGTH = 30
+    
+    # Synchronous Parameters
+    NUM_TRAJECTORIES_SYNC = 64
+    TRAJECTORY_LENGTH_SYNC = 10
+    SAMPLING_RATE_SYNC = 1
+
+    # Asynchronous Parameters
+    NUM_TRAJECTORIES_ASYNC = 64
+    TRAJECTORY_LENGTH_ASYNC = 10
+    SAMPLING_RATE_ASYNC = 1
     
     os.makedirs(MODELS_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -118,14 +126,18 @@ def main():
         model_output_dir = os.path.join(OUTPUT_DIR, model_name)
         os.makedirs(model_output_dir, exist_ok=True)
             
-        # Generate and save trajectories individually
-        for i in range(NUM_TRAJECTORIES):
-            # Synchronous
-            sync_traj = bn.simulate_sync(network, TRAJECTORY_LENGTH)
+        # Generate and save trajectories individually - Synchronous
+        for i in range(NUM_TRAJECTORIES_SYNC):
+            sync_traj = bn.simulate_sync(network, TRAJECTORY_LENGTH_SYNC)
+            # Apply sampling
+            sync_traj = sync_traj[::SAMPLING_RATE_SYNC]
             bn.save_bnf(os.path.join(model_output_dir, f"trajectory_sync_{i}.data"), sync_traj, node_names)
             
-            # Asynchronous
-            async_traj = bn.simulate_async(network, TRAJECTORY_LENGTH)
+        # Generate and save trajectories individually - Asynchronous
+        for i in range(NUM_TRAJECTORIES_ASYNC):
+            async_traj = bn.simulate_async(network, TRAJECTORY_LENGTH_ASYNC)
+            # Apply sampling
+            async_traj = async_traj[::SAMPLING_RATE_ASYNC]
             bn.save_bnf(os.path.join(model_output_dir, f"trajectory_async_{i}.data"), async_traj, node_names)
             
 if __name__ == "__main__":
