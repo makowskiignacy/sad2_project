@@ -1,4 +1,4 @@
-n_nodes,n_steps,sample_every_n,n_trajectories,async/sync,loss,signed_jaccard_distance,reachability_jaccard_distance
+n_nodes,n_steps,sample_every_n,n_trajectories,async/sync,loss,signed_jaccard_score,reachability_jaccard_score
 5,10,1,32,async,MDL,0.5,0.4166666666666667
 5,20,1,64,async,MDL,0.4666666666666667,0.4166666666666667
 5,20,2,32,sync,MDL,0.058823529411764705,0.4166666666666667
